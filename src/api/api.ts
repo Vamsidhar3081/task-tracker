@@ -215,17 +215,26 @@ export const deleteTask = async (taskId: number) => {
   }
 };
 
-export const getTaskById = async (id: number) => {
-  const token = localStorage.getItem("token");
+export const getTaskById = async (taskId: number) => {
+  try {
+    const token = localStorage.getItem("token");
 
-  const res = await axios.get(
-    `http://localhost:5000/api/auth/tasks/${id}`,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    }
-  );
+    const response = await axios.get(
+      `${baseURL}auth/tasks/${taskId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
 
-  return res.data;
+    return response.data;
+  } catch (err: any) {
+    const message =
+      err.response?.data?.message ||
+      err.response?.data?.error ||
+      "Failed to fetch task";
+
+    throw new Error(message);
+  }
 };
