@@ -1,5 +1,5 @@
 import axios from "axios";
-import baseURL from "./base";y
+import baseURL from "./base";
 // import toast from "react-hot-toast";
 
 export const registerUser = async (data: {
