@@ -20,27 +20,28 @@ const CreateTask = () => {
     }
 
     try {
-      setLoading(true);
+  setLoading(true);
 
-      await createTask({
-        title,
-        description,
-        feedback_date: feedbackDate,
-      });
+  const data = await createTask({
+    title,
+    description,
+    feedback_date: feedbackDate,
+  });
 
-      toast.success("Task created successfully");
-      navigate("/dashboard");
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
-    }
+  toast.success(data.message);
+  navigate("/dashboard");
+
+} catch (err: any) {
+  toast.error(err.message);
+} finally {
+  setLoading(false);
+}
   };
 
   return (
     <div className="min-h-screen bg-gray-100">
 
-      {/* Top Bar (Same as Dashboard) */}
+      {/* Top Bar  */}
       <div className="flex justify-between items-center px-6 py-3 bg-white shadow-sm">
         <h1 className="text-xl font-bold">FlowTasks</h1>
 

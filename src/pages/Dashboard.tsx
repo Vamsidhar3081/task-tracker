@@ -181,13 +181,13 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-  const timer = setTimeout(() => {
-    setPage(1);
-    setSearch(searchInput);
-  }, 500); 
+    const timer = setTimeout(() => {
+      setPage(1);
+      setSearch(searchInput);
+    }, 500);
 
-  return () => clearTimeout(timer);
-}, [searchInput]);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -240,22 +240,28 @@ const Dashboard = () => {
               // setPage(1);
               setSearchInput(e.target.value);
             }}
-            className="border border-gray-300 px-4 py-2 rounded-lg w-64 text-sm outline-none"
+            className="border border-gray-300 px-4 py-2 rounded-lg w-64 text-sm shadow-sm outline-none"
           />
+          <div className="relative w-48">
+            <select
+              value={status}
+              onChange={(e) => {
+                setPage(1);
+                setStatus(e.target.value);
+              }}
+              className="w-full appearance-none border border-gray-300 px-4 py-2 pr-10 rounded-lg text-sm shadow-sm 
+               focus:outline-none "
+            >
+              <option value="">All Status</option>
+              <option value="ONGOING">Ongoing</option>
+              <option value="DELAYED">Delayed</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
 
-          <select
-            value={status}
-            onChange={(e) => {
-              setPage(1);
-              setStatus(e.target.value);
-            }}
-            className="border border-gray-300 px-4 py-2 rounded-lg text-sm outline-none"
-          >
-            <option value="">All Status</option>
-            <option value="ONGOING">Ongoing</option>
-            <option value="DELAYED">Delayed</option>
-            <option value="COMPLETED">Completed</option>
-          </select>
+            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-500">
+              ▾
+            </div>
+          </div>
 
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-600 font-medium">
@@ -279,7 +285,7 @@ const Dashboard = () => {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-2xl shadow overflow-visible">
+        <div className="bg-white rounded-2xl shadow-sm overflow-visible">
           <table className="w-full table-fixed text-left">
             <thead className="bg-gray-50 border-b border-gray-200 ">
               <tr>
@@ -519,8 +525,8 @@ const Dashboard = () => {
                   className="bg-black text-white px-5 py-2 rounded-lg text-sm disabled:opacity-60"
                 >
                   {creating ? editingTask
-                      ? "Updating..."
-                      : "Creating..."
+                    ? "Updating..."
+                    : "Creating..."
                     : editingTask
                       ? "Update Task"
                       : "Create Task"}
@@ -535,7 +541,7 @@ const Dashboard = () => {
       {showDelay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
-            className="absolute inset-0 bg-black/20"
+            className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"
             onClick={() => setShowDelay(false)}
           />
 

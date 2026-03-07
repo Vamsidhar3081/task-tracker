@@ -1,5 +1,6 @@
 import axios from "axios";
 import baseURL from "./base";
+import { data } from "react-router-dom";
 // import toast from "react-hot-toast";
 
 export const registerUser = async (data: {
@@ -91,13 +92,20 @@ export const createTask = async ({
 
     return response.data;
   } catch (err: any) {
+  if (err.response && err.response.data) {
+    const data = err.response.data;
+
     const message =
-      err.response?.data?.message ||
-      err.response?.data?.error ||
-      "Failed to create ticket";
+      data.errors?.[0] || 
+      data.error ||         
+      data.message ||      
+      "Failed to create task";
 
     throw new Error(message);
   }
+
+  throw new Error(err.message || "Failed to create task");
+}
 };
 
 export const updateTask = async (
@@ -128,11 +136,13 @@ export const updateTask = async (
 
     return response.data;
   } catch (err: any) {
+    const data = err.response?.data;
     const message =
-      err.response?.data?.message ||
-      err.response?.data?.error ||
+    data.errors?.[0] ||
+      data.error ||
+      data.message ||
       "Failed to update task";
-
+      
     throw new Error(message);
   }
 };
