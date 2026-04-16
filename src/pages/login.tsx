@@ -62,8 +62,9 @@ const Login = () => {
           </p>
           <h2 className="mb-2 text-3xl font-semibold text-gray-900">Sign in to FlowTasks</h2>
           <p className="mb-8 text-sm text-gray-500">
-  Demo Admin Login: <span className="font-medium">admin@test.com </span> / <span className="font-medium">pass : 123456</span>
-  Demo user login: <span className="font-medium">vamsi@gmail.com</span> / <span className="font-medium">pass: 123456</span>
+  Demo Admin Login: <span className="font-medium">admin@test.com </span> / <span className="font-medium">pass : 123456</span></p>
+  <p className="mb-8 text-sm text-gray-500">
+    Demo user login: <span className="font-medium">vamsi@gmail.com</span> / <span className="font-medium">pass: 123456</span>
 </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
