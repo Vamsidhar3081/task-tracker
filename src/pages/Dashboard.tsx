@@ -6,7 +6,6 @@ import {
   completeTask,
   createTask,
   delayTask,
-  deleteManagedUser,
   deleteTask,
   getStoredRole,
   getStoredUserId,
@@ -31,6 +30,11 @@ const initialMeta: MetaState = {
   totalPages: 1,
 };
 
+const Loader = () => (
+  <div className="flex justify-center items-center py-2">
+    <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900"></div>
+  </div>
+);
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -344,6 +348,11 @@ const Dashboard = () => {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-3">
+        {isAdmin && usersLoading && (
+    <div className="mb-2">
+      <Loader />
+    </div>
+  )}
         <section className="mb-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
           <article className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
             <div className="flex items-center justify-between"> {/* LEFT CONTENT */}
