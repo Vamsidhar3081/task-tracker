@@ -31,7 +31,6 @@ const initialMeta: MetaState = {
   totalPages: 1,
 };
 
-const statusOptions = ["ONGOING", "DELAYED", "COMPLETED"] as const;
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -64,10 +63,7 @@ const Dashboard = () => {
   const [delayDate, setDelayDate] = useState("");
   const [delayTaskId, setDelayTaskId] = useState<number | null>(null);
   const [delaying, setDelaying] = useState(false);
-  // const [showAdminPanel, setShowAdminPanel] = useState(false);
-  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const [menuDir, setMenuDir] = useState<"up" | "down">("down");
-
   const userOptions = useMemo(
     () => users.map((user) => ({ value: user.id, label: `${user.name} (${user.email})` })),
     [users]
@@ -293,36 +289,6 @@ const Dashboard = () => {
     }
   };
 
-  const handleDeleteUser = async (userId: number) => {
-    try {
-      await deleteManagedUser(userId);
-      toast.success("User deleted successfully");
-      await fetchUsers();
-      await fetchTasks(1);
-    } catch (err) {
-      toast.error((err as Error).message || "Failed to delete user");
-    }
-  };
-
-  const handleStatusChange = async (taskId: number, nextStatus: string) => {
-    try {
-      if (nextStatus === "COMPLETED") {
-        await completeTask(taskId);
-        toast.success("Task completed");
-      } else {
-        await updateTask(taskId, { status: nextStatus });
-        toast.success("Task status updated");
-      }
-
-      await fetchTasks();
-      if (isAdmin) {
-        await fetchUsers();
-      }
-    } catch (err) {
-      toast.error((err as Error).message || "Failed to update task status");
-    }
-  };
-
   const completedTasks = tasks.filter((task) => task.status === "COMPLETED").length;
   const delayedTasks = tasks.filter((task) => task.status === "DELAYED").length;
   const overdueTasks = tasks.filter((task) => task.is_overdue === 1).length;
@@ -337,10 +303,6 @@ const Dashboard = () => {
               {isAdmin ? "Admin Task Workspace" : "My Tasks"}
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-slate-500">
-
-              {/* {isAdmin
-                ? "Create users, assign tasks, and manage everything from one place."
-                : "Create, update, delay, and complete your own tasks."} */}
             </p>
           </div>
 
