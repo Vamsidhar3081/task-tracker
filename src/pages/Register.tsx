@@ -1,131 +1,176 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { registerUser } from "../api/api";
+import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import { createManagedUser, getStoredRole, isAdminRole, registerUser } from "../api/api";
 
 const Register = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const currentRole = getStoredRole();
+
+  const isCreateUserMode = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("mode") === "create-user";
+  }, [location.search]);
 
   const [form, setForm] = useState({
     name: "",
     email: "",
     password: "",
   });
-
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (isCreateUserMode && !isAdminRole()) {
+      navigate("/login", { replace: true });
+    }
+  }, [isCreateUserMode, navigate]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!form.name || !form.email || !form.password) {
-      return toast.error("All fields are required");
+    if (!form.name.trim() || !form.email.trim() || !form.password.trim()) {
+      toast.error("All fields are required");
+      return;
+    }
+
+    if (form.name.trim().length < 3) {
+      toast.error("Name must be at least 3 characters");
+      return;
+    }
+
+    if (!/\S+@\S+\.\S+/.test(form.email)) {
+      toast.error("Enter a valid email");
+      return;
+    }
+
+    if (form.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
     }
 
     try {
       setLoading(true);
-      await registerUser(form);
-      toast.success("Registration successful");
-      navigate("/login");
-    } catch (err: any) {
-      toast.error(err.message || "Registration failed");
+
+      if (isCreateUserMode) {
+        const response = await createManagedUser({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          password: form.password,
+          role: "USER",
+        });
+
+        toast.success(response?.message || "User created successfully");
+        navigate("/dashboard");
+      } else {
+        const response = await registerUser({
+          name: form.name.trim(),
+          email: form.email.trim(),
+          password: form.password,
+        });
+
+        toast.success(response?.message || "Registration successful");
+        navigate("/login");
+      }
+
+      setForm({ name: "", email: "", password: "" });
+    } catch (err) {
+      toast.error((err as Error).message || "Registration failed");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-100">
-
-      {/* Left Branding Section (Desktop Only) */}
-      <div className="hidden lg:flex w-1/2 bg-black text-white flex-col justify-center px-16">
-        <h1 className="text-4xl font-bold mb-6">FlowTasks</h1>
-        <p className="text-lg text-gray-300 leading-relaxed">
-          Organize your goals.
-          Track delays.
-          Build discipline.
+    <div className="min-h-screen bg-gray-100 lg:grid lg:grid-cols-2">
+      <section className="hidden bg-black px-16 text-white lg:flex lg:flex-col lg:justify-center">
+        <p className="mb-4 text-sm uppercase tracking-[0.3em] text-gray-400">
+          {isCreateUserMode ? "Admin Workspace" : "FlowTasks"}
         </p>
-      </div>
+        <h1 className="mb-6 text-5xl font-semibold leading-tight">
+          {isCreateUserMode ? "Create a user from the admin console." : "Create your FlowTasks account."}
+        </h1>
+        <p className="max-w-lg text-lg leading-8 text-gray-300">
+          {isCreateUserMode
+            ? `Signed in as ${currentRole ?? "ADMIN"}. New users will use the same login page after creation.`
+            : "Start managing tasks, delays, and completion status from one clean workspace."}
+        </p>
+      </section>
 
-      {/* Right Form Section */}
-      <div className="flex flex-1 items-center justify-center px-6">
-        <div className="w-full max-w-md bg-white p-10 rounded-2xl shadow-xl">
-
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Create Account
+      <section className="flex min-h-screen items-center justify-center px-6 py-10">
+        <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-xl">
+          <p className="mb-2 text-sm font-medium uppercase tracking-[0.25em] text-gray-400">
+            {isCreateUserMode ? "Create user" : "Register"}
+          </p>
+          <h2 className="mb-2 text-3xl font-semibold text-gray-900">
+            {isCreateUserMode ? "Add a new user" : "Create account"}
           </h2>
-
-          <p className="text-gray-500 mb-6">
-            Start managing your tasks smarter.
+          <p className="mb-8 text-sm text-gray-500">
+            {isCreateUserMode
+              ? "This user will sign in with the same login form as everyone else."
+              : "Create an account to access your personal task dashboard."}
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name
-              </label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Full Name</label>
               <input
                 type="text"
                 name="name"
                 value={form.name}
                 onChange={handleChange}
-                className="w-full border border-gray-300 focus:border-black focus:ring-0 rounded-lg px-4 py-3 outline-none transition"
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none transition focus:border-black"
                 placeholder="John Doe"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Email</label>
               <input
                 type="email"
                 name="email"
                 value={form.email}
                 onChange={handleChange}
-                className="w-full border border-gray-300 focus:border-black focus:ring-0 rounded-lg px-4 py-3 outline-none transition"
-                placeholder="you@example.com"
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none transition focus:border-black"
+                placeholder="user@example.com"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Password</label>
               <input
                 type="password"
                 name="password"
                 value={form.password}
                 onChange={handleChange}
-                className="w-full border border-gray-300 focus:border-black focus:ring-0 rounded-lg px-4 py-3 outline-none transition"
-                placeholder="••••••••"
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none transition focus:border-black"
+                placeholder="Minimum 6 characters"
               />
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition disabled:opacity-60"
-            >
-              {loading ? "Creating Account..." : "Create Account"}
-            </button>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => navigate(isCreateUserMode ? "/dashboard" : "/login")}
+                className="flex-1 rounded-xl border border-gray-300 py-3 font-medium text-gray-700 transition hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex-1 rounded-xl bg-black py-3 font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loading ? "Saving..." : isCreateUserMode ? "Create User" : "Create Account"}
+              </button>
+            </div>
           </form>
-
-          <p className="text-sm text-gray-500 mt-6 text-center">
-            Already have an account?{" "}
-            <span
-              onClick={() => navigate("/login")}
-              className="text-black font-medium cursor-pointer hover:underline"
-            >
-              Sign in
-            </span>
-          </p>
         </div>
-      </div>
+      </section>
     </div>
   );
 };

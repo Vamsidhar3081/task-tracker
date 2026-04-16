@@ -1,134 +1,240 @@
-import { useEffect, useState, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { getTasks, createTask, updateTask, deleteTask, delayTask, completeTask } from "../api/api";
+import {
+  clearAuthSession,
+  completeTask,
+  createTask,
+  delayTask,
+  deleteManagedUser,
+  deleteTask,
+  getStoredRole,
+  getStoredUserId,
+  getTasks,
+  getUsers,
+  isAdminRole,
+  updateTask,
+} from "../api/api";
+import type { TaskItem, UserSummary } from "../api/api";
 
-interface Task {
-  id: number;
-  title: string;
-  description: string;
-  status: string;
-  created_at: string;
-  is_overdue: number;
-  feedback_date: string;
+interface MetaState {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
 }
+
+const initialMeta: MetaState = {
+  total: 0,
+  page: 1,
+  limit: 10,
+  totalPages: 1,
+};
+
+const statusOptions = ["ONGOING", "DELAYED", "COMPLETED"] as const;
 
 const Dashboard = () => {
   const navigate = useNavigate();
-
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const role = getStoredRole()?.toUpperCase() || "";
+  const currentUserId = getStoredUserId();
+  const isAdmin = isAdminRole();
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
+  const [users, setUsers] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const [showOverdue, setShowOverdue] = useState(false);
-
-  const [meta, setMeta] = useState({
-    total: 0,
-    page: 1,
-    limit: 10,
-    totalPages: 1,
-  });
-
-  // Drawer state
+  const [meta, setMeta] = useState<MetaState>(initialMeta);
+  const [assignedFilter, setAssignedFilter] = useState<number | "">("");
   const [showCreate, setShowCreate] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [feedbackDate, setFeedbackDate] = useState("");
+  const [taskStatus, setTaskStatus] = useState("ONGOING");
+  const [assignedTo, setAssignedTo] = useState<number | "">("");
   const [creating, setCreating] = useState(false);
-  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editingTask, setEditingTask] = useState<TaskItem | null>(null);
   const [openMenuId, setOpenMenuId] = useState<number | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  // for delay
   const [showDelay, setShowDelay] = useState(false);
   const [delayReason, setDelayReason] = useState("");
   const [delayDate, setDelayDate] = useState("");
   const [delayTaskId, setDelayTaskId] = useState<number | null>(null);
   const [delaying, setDelaying] = useState(false);
-  const [searchInput, setSearchInput] = useState("");
+  // const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+  const [menuDir, setMenuDir] = useState<"up" | "down">("down");
 
-  const resetForm = () => {
+  const userOptions = useMemo(
+    () => users.map((user) => ({ value: user.id, label: `${user.name} (${user.email})` })),
+    [users]
+  );
+
+  const resetTaskForm = useCallback(() => {
     setEditingTask(null);
     setTitle("");
     setDescription("");
     setFeedbackDate("");
+    setTaskStatus("ONGOING");
+    setAssignedTo(isAdmin ? "" : currentUserId);
+  }, [currentUserId, isAdmin]);
+
+  const closeDelayModal = () => {
+    setShowDelay(false);
+    setDelayReason("");
+    setDelayDate("");
+    setDelayTaskId(null);
   };
 
-  // Protect route
+  const fetchUsers = useCallback(async () => {
+    if (!isAdmin) {
+      setUsers([]);
+      return;
+    }
+
+    try {
+      setUsersLoading(true);
+      const data = await getUsers();
+      setUsers(data.users);
+    } catch (err) {
+      toast.error((err as Error).message || "Failed to fetch users");
+    } finally {
+      setUsersLoading(false);
+    }
+  }, [isAdmin]);
+
+  const fetchTasks = useCallback(
+    async (targetPage = page) => {
+      try {
+        setLoading(true);
+        const data = await getTasks({
+          page: targetPage,
+          limit: 10,
+          search,
+          status,
+          filter: showOverdue ? "overdue" : "",
+          assignedTo: isAdmin && assignedFilter !== "" ? assignedFilter : "",
+        });
+
+        setTasks(data?.task || []);
+        setMeta(data?.meta || initialMeta);
+      } catch (err) {
+        toast.error((err as Error).message || "Failed to fetch tasks");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [assignedFilter, isAdmin, page, search, showOverdue, status]
+  );
+
   useEffect(() => {
     const token = localStorage.getItem("token");
-    if (!token) navigate("/login");
-  }, []);
+    if (!token) {
+      navigate("/login");
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    resetTaskForm();
+  }, [resetTaskForm]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      setSearch(searchInput);
+    }, 400);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
 
   useEffect(() => {
     fetchTasks();
-  }, [page, search, status, showOverdue]);
+  }, [fetchTasks]);
 
-  const fetchTasks = async () => {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
-      const data = await getTasks({
-        page,
-        limit: 10,
-        search,
-        status,
-        filter: showOverdue ? "overdue" : "",
-      });
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
 
-      setTasks(data.task);
-      setMeta(data.meta);
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
+    clearAuthSession();
     navigate("/login");
+  };
+
+  const openEditDrawer = (task: TaskItem) => {
+    setEditingTask(task);
+    setTitle(task.title);
+    setDescription(task.description);
+    setFeedbackDate(task.feedback_date ? task.feedback_date.slice(0, 10) : "");
+    setTaskStatus(task.status);
+    setAssignedTo(task.assigned_to ?? "");
+    setShowCreate(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!title.trim() || !description.trim()) {
-      toast.error("Title and Description are required");
+    if (title.trim().length < 3) {
+      toast.error("Title must be at least 3 characters");
       return;
     }
 
-    // Only require date in CREATE mode
-    if (!editingTask && !feedbackDate) {
+    if (description.trim().length < 3) {
+      toast.error("Description must be at least 3 characters");
+      return;
+    }
+
+    if (!feedbackDate) {
       toast.error("Feedback date is required");
+      return;
+    }
+
+    if (isAdmin && assignedTo === "") {
+      toast.error("Please assign this task to a user");
       return;
     }
 
     try {
       setCreating(true);
 
-      if (editingTask) {
-        await updateTask(editingTask.id, {
-          title: title.trim(),
-          description: description.trim(),
-        });
+      const payload = {
+        title: title.trim(),
+        description: description.trim(),
+        feedback_date: feedbackDate,
+        status: taskStatus,
+        ...(assignedTo !== "" ? { assignedTo: Number(assignedTo) } : {}),
+      };
 
+      if (editingTask) {
+        await updateTask(editingTask.id, payload);
         toast.success("Task updated successfully");
       } else {
-        await createTask({
-          title: title.trim(),
-          description: description.trim(),
-          feedback_date: feedbackDate,
-        });
-
+        await createTask(payload);
         toast.success("Task created successfully");
       }
-      resetForm();
-      setShowCreate(false);
 
-      fetchTasks();
-    } catch (err: any) {
-      toast.error(err.message);
+      resetTaskForm();
+      setShowCreate(false);
+      setPage(1);
+      await fetchTasks(1);
+      if (isAdmin) {
+        await fetchUsers();
+      }
+    } catch (err) {
+      toast.error((err as Error).message || "Something went wrong");
     } finally {
       setCreating(false);
     }
@@ -138,383 +244,544 @@ const Dashboard = () => {
     try {
       await completeTask(taskId);
       toast.success("Task completed");
-      fetchTasks();
-    } catch (err: any) {
-      toast.error(err.message);
+      await fetchTasks();
+      if (isAdmin) {
+        await fetchUsers();
+      }
+    } catch (err) {
+      toast.error((err as Error).message || "Something went wrong");
     }
   };
 
   const handleDelayTask = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!delayReason || !delayDate || !delayReason.trim()) {
-      return toast.error("All fields are required");
+    if (!delayTaskId || !delayReason.trim() || !delayDate) {
+      toast.error("Reason and new date are required");
+      return;
     }
+
     try {
       setDelaying(true);
-      await delayTask(delayTaskId!, {
+      await delayTask(delayTaskId, {
         reason: delayReason.trim(),
         newDate: delayDate,
       });
       toast.success("Task delayed successfully");
-      setDelayDate("");
-      setDelayReason("");
-      setDelayTaskId(null);
-      setShowDelay(false);
-
-      fetchTasks();
-    } catch (err: any) {
-      toast.error(err.message);
+      closeDelayModal();
+      await fetchTasks();
+      if (isAdmin) {
+        await fetchUsers();
+      }
+    } catch (err) {
+      toast.error((err as Error).message || "Something went wrong");
     } finally {
       setDelaying(false);
     }
-  }
+  };
 
   const handleDeleteTask = async (taskId: number) => {
     try {
       await deleteTask(taskId);
       toast.success("Task deleted successfully");
-      fetchTasks();
-    } catch (err: any) {
-      toast.error(err.message);
+      await fetchTasks();
+      if (isAdmin) {
+        await fetchUsers();
+      }
+    } catch (err) {
+      toast.error((err as Error).message || "Something went wrong");
     }
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setPage(1);
-      setSearch(searchInput);
-    }, 500);
+  const handleDeleteUser = async (userId: number) => {
+    try {
+      await deleteManagedUser(userId);
+      toast.success("User deleted successfully");
+      await fetchUsers();
+      await fetchTasks(1);
+    } catch (err) {
+      toast.error((err as Error).message || "Failed to delete user");
+    }
+  };
 
-    return () => clearTimeout(timer);
-  }, [searchInput]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node)
-      ) {
-        setOpenMenuId(null);
+  const handleStatusChange = async (taskId: number, nextStatus: string) => {
+    try {
+      if (nextStatus === "COMPLETED") {
+        await completeTask(taskId);
+        toast.success("Task completed");
+      } else {
+        await updateTask(taskId, { status: nextStatus });
+        toast.success("Task status updated");
       }
-    };
 
-    document.addEventListener("mousedown", handleClickOutside);
+      await fetchTasks();
+      if (isAdmin) {
+        await fetchUsers();
+      }
+    } catch (err) {
+      toast.error((err as Error).message || "Failed to update task status");
+    }
+  };
 
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
+  const completedTasks = tasks.filter((task) => task.status === "COMPLETED").length;
+  const delayedTasks = tasks.filter((task) => task.status === "DELAYED").length;
+  const overdueTasks = tasks.filter((task) => task.is_overdue === 1).length;
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Top Bar */}
-      <div className="flex justify-between items-center px-6 py-2 bg-white shadow-sm">
-        <h1 className="text-xl font-bold">FlowTasks</h1>
+    <div className="min-h-screen bg-[radial-gradient(circle_at_20%_20%,rgba(199,210,254,0.6),transparent_40%),radial-gradient(circle_at_80%_0%,rgba(147,197,253,0.5),transparent_40%),radial-gradient(circle_at_50%_100%,rgba(224,231,255,0.6),transparent_50%)] bg-[length:200%_200%] animate-gradientMove">
+      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-1">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Signed in as {role}.{" "}</p>
+            <h1 className="text-2xl font-semibold text-slate-950 md:text-3xl">
+              {isAdmin ? "Admin Task Workspace" : "My Tasks"}
+            </h1>
+            <p className="mt-1 max-w-2xl text-sm text-slate-500">
 
-        <div className="flex gap-4">
-          <button
-            onClick={() => setShowCreate(true)}
-            className="bg-black text-white px-4 py-2 rounded-lg text-sm hover:bg-gray-800 transition"
-          >
-            + Create Task
-          </button>
-
-          <button
-            onClick={handleLogout}
-            className="border border-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-100 transition"
-          >
-            Logout
-          </button>
-        </div>
-      </div>
-
-      <div className="p-8 pt-4 pb-0">
-        {/* Controls */}
-        <div className=" flex flex-wrap items-center gap-6 mb-3">
-          <input
-            type="text"
-            placeholder="Search tasks..."
-            value={searchInput}
-            onChange={(e) => {
-              // setPage(1);
-              setSearchInput(e.target.value);
-            }}
-            className="border border-gray-300 px-4 py-2 rounded-lg w-64 text-sm shadow-sm outline-none"
-          />
-          <div className="relative w-48">
-            <select
-              value={status}
-              onChange={(e) => {
-                setPage(1);
-                setStatus(e.target.value);
-              }}
-              className="w-full appearance-none border border-gray-300 px-4 py-2 pr-10 rounded-lg text-sm shadow-sm 
-               focus:outline-none "
-            >
-              <option value="">All Status</option>
-              <option value="ONGOING">Ongoing</option>
-              <option value="DELAYED">Delayed</option>
-              <option value="COMPLETED">Completed</option>
-            </select>
-
-            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-500">
-              ▾
-            </div>
+              {/* {isAdmin
+                ? "Create users, assign tasks, and manage everything from one place."
+                : "Create, update, delay, and complete your own tasks."} */}
+            </p>
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600 font-medium">
-              Overdue Only
-            </span>
+          <div className="flex flex-wrap items-center gap-3">
+            {isAdmin && (
+              <button
+                onClick={() => navigate("/register?mode=create-user")}
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+              >
+                Create User
+              </button>
+            )}
+
+            {isAdmin && (<button
+              onClick={() => navigate("/admin")}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+            >
+              Admin Panel
+            </button>)}
 
             <button
               onClick={() => {
-                setPage(1);
-                setShowOverdue((prev) => !prev);
+                resetTaskForm();
+                setShowCreate(true);
               }}
-              className={`w-12 h-6 flex items-center rounded-full p-1 transition ${showOverdue ? "bg-red-500" : "bg-gray-300"
-                }`}
+              className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-slate-950/10 transition hover:bg-slate-800"
             >
-              <div
-                className={`bg-white w-4 h-4 rounded-full shadow transform transition ${showOverdue ? "translate-x-6" : ""
-                  }`}
-              />
+              + Create Task
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+            >
+              Logout
             </button>
           </div>
         </div>
+      </header>
 
-        {/* Table */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-visible">
-          <table className="w-full table-fixed text-left">
-            <thead className="bg-gray-50 border-b border-gray-200 ">
-              <tr>
-                <th className="px-3 py-3 w-1/4 text-sm font-semibold text-gray-600 rounded-tl-2xl">Title</th>
-                <th className="px-3 py-3 w-2/4 text-sm font-semibold text-gray-600">Description</th>
-                <th className="px-3 py-3 w-1/5 text-sm font-semibold text-gray-600">Status</th>
-                <th className="px-3 py-3 w-1/5 text-sm font-semibold text-gray-600">Created</th>
-                <th className="px-3 py-3 w-[60px] rounded-tr-2xl"></th>
-              </tr>
-            </thead>
+      <main className="mx-auto max-w-7xl px-4 py-3">
+        <section className="mb-3 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+          <article className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between"> {/* LEFT CONTENT */}
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  Total Tasks
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {isAdmin ? "All users" : "Your tasks"}
+                </p>
+              </div>
+              <p className="text-2xl font-semibold text-slate-950">{/* RIGHT NUMBER */}
+                {meta.total}
+              </p>
+            </div>
+          </article>
 
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-sm">
-                    Loading...
-                  </td>
-                </tr>
-              ) : tasks.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-3 py-6 text-center text-sm text-gray-500">
-                    No tasks found
-                  </td>
-                </tr>
-              ) : (
-                tasks.map((task) => (
-                  <tr
-                    key={task.id}
-                    className="border-b last:border-b-0 hover:bg-gray-50 transition"
-                  >
-                    {/* Title */}
-                    <td className="px-3 py-2 text-sm font-medium">
-                      {task.is_overdue === 1 && (
-                        <span className="inline-block w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                      )}
-                      <Link
-                        to={`/tasks/${task.id}`}
-                        state={{ task }}
-                        className="text-blue-600 hover:underline hover:text-blue-800 transition"
-                      >
-                        {task.title}
-                      </Link>
-                    </td>
+          {/* COMPLETED */}
+          <article className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  Completed
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Tasks successfully completed
+                </p>
+              </div>
+              <p className="text-2xl font-semibold text-emerald-600">
+                {completedTasks}
+              </p>
 
-                    {/* Description */}
-                    <td className="px-3 py-2 text-sm text-gray-500 truncate">
-                      {task.description}
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-3 py-2 text-sm">
-                      <span
-                        className={`text-xs px-2 py-1 rounded ${task.status === "COMPLETED"
-                          ? "bg-green-100 text-green-700"
-                          : task.status === "DELAYED"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-blue-100 text-blue-700"
-                          }`}
-                      >
-                        {task.status}
-                      </span>
-                    </td>
-
-                    {/* Created */}
-                    <td className="px-3 py-2 text-xs text-gray-500">
-                      {new Date(task.created_at).toLocaleDateString()}
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-3 py-2 text-right relative">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenMenuId(openMenuId === task.id ? null : task.id);
-                        }}
-                        className="text-gray-600 hover:text-black text-lg px-2"
-                      >
-                        ⋮
-                      </button>
-
-                      {openMenuId === task.id && (
-                        <div
-                          ref={menuRef}
-                          className="absolute right-0 bottom-full mt-2 w-32 bg-white border border-gray-200 rounded-lg shadow-lg z-20"
-                        >
-                          {task.status !== "COMPLETED" && (
-                            <button
-                              onClick={() => {
-                                handleCompleteTask(task.id);
-                                setOpenMenuId(null);
-                              }}
-                              className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-green-600"
-                            >
-                              Complete
-                            </button>
-                          )}
-
-                          <button
-                            onClick={() => {
-                              setEditingTask(task);
-                              setTitle(task.title);
-                              setDescription(task.description);
-                              setShowCreate(true);
-                              setOpenMenuId(null);
-                            }}
-                            className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100"
-                          >
-                            Edit
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              if (task.status === "COMPLETED") {
-                                toast.error("Cannot delay completed task");
-                                return;
-                              }
-
-                              setDelayTaskId(task.id);
-                              setShowDelay(true);
-                              setOpenMenuId(null);
-                            }}
-                            className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-100 text-yellow-600"
-                          >
-                            Delay
-                          </button>
-
-                          <button
-                            onClick={() => {
-                              handleDeleteTask(task.id);
-                              setOpenMenuId(null);
-                            }}
-                            className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )}
-                    </td>
-
-                  </tr>
-                ))
-              )}
-            </tbody>
-
-          </table>
-        </div>
-
-        {/* Pagination */}
-        <div className="flex justify-between items-center mt-4">
-          <button
-            disabled={page === 1}
-            onClick={() => setPage((prev) => prev - 1)}
-            className="px-4 py-2 border rounded-lg text-sm disabled:opacity-50"
+            </div>
+          </article>
+          {/* DELAYED */}
+          <article className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  Delayed
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Revised feedback dates
+                </p>
+              </div>
+              <p className="text-2xl font-semibold text-amber-600">
+                {delayedTasks}
+              </p>
+            </div>
+          </article>
+          {/* OVERDUE */}
+          <article className="rounded-2xl border border-white/70 bg-white/80 p-3 shadow-sm backdrop-blur">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  Overdue
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Needs attention
+                </p>
+              </div>
+              <p className="text-2xl font-semibold text-rose-600">
+                {overdueTasks}
+              </p>
+            </div>
+          </article>
+        </section>
+        <section className="mb-2 grid gap-1.5 rounded-lg border border-white/70 bg-white/85 p-2 shadow-sm backdrop-blur lg:grid-cols-[1.4fr_180px_160px_180px]">
+          <input
+            type="text"
+            placeholder="Search tasks by title, description, or assignee"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="w-full rounded-lg border border-slate-3 00 bg-white px-3 py-1.5 text-xs outline-none transition focus:border-slate-950"
+          />
+          <select
+            value={status}
+            onChange={(e) => {
+              setPage(1);
+              setStatus(e.target.value);
+            }}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs outline-none transition focus:border-slate-950"
           >
-            Previous
-          </button>
+            <option value="">All Status</option>
+            <option value="ONGOING">Ongoing</option>
+            <option value="DELAYED">Delayed</option>
+            <option value="COMPLETED">Completed</option>
+          </select>
 
-          <span className="text-sm text-gray-500">
-            Page {meta.page} of {meta.totalPages}
-          </span>
+          {isAdmin && (
+            <select
+              value={assignedFilter}
+              onChange={(e) => {
+                setPage(1);
+                setAssignedFilter(e.target.value ? Number(e.target.value) : "");
+              }}
+              className="w-full rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs outline-none transition focus:border-slate-950"
+            >
+              <option value="">All Users</option>
+              {userOptions.map((user) => (
+                <option key={user.value} value={user.value}>
+                  {user.label}
+                </option>
+              ))}
+            </select>
+          )
+            //  : 
+            // (
+            //   <div className="rounded-lg border border-dashed border-slate-300 px-2 py-1.5 text-xs text-slate-500">
+            //     Personal tasks only
+            //   </div>
+            // )
+          }
 
           <button
-            disabled={page === meta.totalPages}
-            onClick={() => setPage((prev) => prev + 1)}
-            className="px-4 py-2 border rounded-lg text-sm disabled:opacity-50"
-          >
-            Next
-          </button>
-        </div>
-      </div>
-
-      {/* CREATE DRAWER */}
-      {showCreate && (
-        <div className="fixed inset-0 z-50 flex">
-          <div
-            className="flex-1 bg-neutral-900/20 backdrop-blur-[2px]"
             onClick={() => {
-              setShowCreate(false)
-              resetForm()
-            }
-            }
+              setPage(1);
+              setShowOverdue((prev) => !prev);
+            }}
+            className={`rounded-lg px-2 py-1.5 text-xs font-medium transition ${showOverdue
+              ? "bg-rose-500 text-white shadow-lg shadow-rose-500/20"
+              : "border border-slate-300 bg-white text-slate-700"
+              }`}
+          >
+            {showOverdue ? "Overdue Only On" : "Show Overdue"}
+          </button>
+        </section>
+
+        <section className="overflow-hidden rounded-xl border border-white/70 bg-white/90 shadow-sm backdrop-blur">
+          <div className="min-h-[330px] max-h-[330px] overflow-y-auto">
+            <table className="min-w-full text-left ">
+              <thead className="bg-slate-200 h-10 sticky top-0 z-20 border-b border-slate-300">
+                <tr className="text-xs text-slate-600 ">
+                  <th className="px-3 py-2 font-semibold">Title</th>
+                  <th className="px-3 py-2 font-semibold">Description</th>
+                  <th className="px-3 py-2 font-semibold">Status</th>
+                  <th className="px-3 py-2 font-semibold">Feedback</th>
+                  {/* <th className="px-3 py-2 font-semibold">Quick Update</th> */}
+                  {isAdmin && <th className="px-3 py-2 font-semibold">Assigned To</th>}
+                  <th className="px-3 py-2 font-semibold">Created</th>
+                  <th className="px-3 py-2 font-semibold">Actions</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td
+                      colSpan={isAdmin ? 8 : 7}
+                      className="px-3 py-2 text-center text-xs text-slate-500"
+                    >
+                      Loading tasks...
+                    </td>
+                  </tr>
+                ) : tasks.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={isAdmin ? 8 : 7}
+                      className="px-3 py-2 text-center text-xs text-slate-500"
+                    >
+                      No tasks found
+                    </td>
+                  </tr>
+                ) : (
+                  tasks.map((task) => (
+                    <tr key={task.id} className="border-t border-slate-100 align-middle even:bg-slate-50 hover:bg-slate-100 transition">
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          {task.is_overdue === 1 && (
+                            <span className="h-2.5 w-2.5 rounded-full bg-rose-500" />
+                          )}
+                          <Link
+                            to={`/tasks/${task.id}`}
+                            className="font-medium text-indigo-600 transition hover:text-indigo-800 hover:underline"
+                          >
+                            {task.title}
+                          </Link>
+                        </div>
+                      </td>
+
+                      <td className="max-w-[200px] px-3 py-2 text-xs text-slate-600 truncate">{task.description}</td>
+
+                      <td className="px-3 py-2">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${task.status === "COMPLETED"
+                            ? "bg-green-100 text-green-700"
+                            : task.status === "DELAYED"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-blue-100 text-blue-700"
+                            }`}
+                        >
+                          {task.status}
+                        </span>
+                      </td>
+
+                      <td className="px-3 py-2 text-sm text-slate-500">
+                        {task.feedback_date ? new Date(task.feedback_date).toLocaleDateString() : "-"}
+                      </td>
+
+                      {isAdmin && (
+                        <td className="px-3 py-2 text-sm text-slate-600">
+                          {task.assignee_name || "Unassigned"}
+                        </td>
+                      )}
+
+                      <td className="px-3 py-2 text-sm text-slate-500">
+                        {new Date(task.created_at).toLocaleDateString()}
+                      </td>
+
+                      <td className="px-3 py-2">
+                        <div className="relative" ref={openMenuId === task.id ? menuRef : null}>
+
+                          <button
+                            onClick={(e) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setMenuDir(window.innerHeight - rect.bottom < 160 ? "up" : "down");
+                              setOpenMenuId((prev) => (prev === task.id ? null : task.id));
+                            }}
+                            className="rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-700 transition hover:bg-slate-50"
+                          >
+                            Actions
+                          </button>
+                          {openMenuId === task.id && (
+                            <div className={`absolute right-0 z-50 w-36 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg
+    ${menuDir === "up" ? "bottom-full mb-1" : "top-full mt-1"}`}
+                            >
+                              {task.status !== "COMPLETED" && (
+                                <button
+                                  onClick={() => {
+                                    handleCompleteTask(task.id);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="block w-full rounded-lg px-2 py-1 text-left text-xs text-emerald-700 transition hover:bg-slate-50"
+                                >
+                                  Mark Complete
+                                </button>
+                              )}
+
+                              <button
+                                onClick={() => {
+                                  openEditDrawer(task);
+                                  setOpenMenuId(null);
+                                }}
+                                className="block w-full rounded-lg px-2 py-1 text-left text-xs text-slate-700 transition hover:bg-slate-50"
+                              >
+                                Edit Task
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  if (task.status === "COMPLETED") {
+                                    toast.error("Cannot delay a completed task");
+                                    return;
+                                  }
+                                  setDelayTaskId(task.id);
+                                  setShowDelay(true);
+                                  setOpenMenuId(null);
+                                }}
+                                className="block w-full rounded-lg px-2 py-1 text-left text-xs text-amber-700 transition hover:bg-slate-50"
+                              >
+                                Delay Task
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  handleDeleteTask(task.id);
+                                  setOpenMenuId(null);
+                                }}
+                                className="block w-full rounded-lg px-2 py-1 text-left text-xs text-rose-600 transition hover:bg-slate-50"
+                              >
+                                Delete Task
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="flex flex-wrap items-center  ttext-xs justify-between gap-3 border-t border-slate-100 px-3 py-2">
+            <button
+              disabled={page === 1}
+              onClick={() => setPage((prev) => prev - 1)}
+              className="rounded-xl border border-slate-300 px-2 py-1 text-xs text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Previous
+            </button>
+
+            <span className="text-xs text-slate-500">
+              Page {meta.page} of {meta.totalPages}
+            </span>
+
+            <button
+              disabled={page >= meta.totalPages}
+              onClick={() => setPage((prev) => prev + 1)}
+              className="rounded-xl border border-slate-300 px-2 py-1 text-xs text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
+        </section>
+      </main>
+
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex bg-black/20 backdrop-blur-[2px]">
+          <div
+            className="flex-1"
+            onClick={() => {
+              setShowCreate(false);
+              resetTaskForm();
+            }}
           />
 
-          <div className="w-[40%] bg-white h-full shadow-2xl p-8 overflow-y-auto">
-            <h2 className="text-lg font-semibold mb-6">
+          <aside className="h-full w-full max-w-xl overflow-y-auto bg-white p-8 shadow-2xl">
+            <h2 className="mb-2 text-2xl font-semibold text-slate-950">
               {editingTask ? "Update Task" : "Create New Task"}
             </h2>
+            <p className="mb-6 text-sm text-slate-500">
+              {isAdmin
+                ? "Create and assign tasks, or update status and ownership from the same form."
+                : "Manage your task details, feedback date, and completion status."}
+            </p>
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">Title</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Title</label>
                 <input
                   type="text"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full border border-gray-300 px-4 py-2 rounded-lg text-sm"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-950"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">Description</label>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Description</label>
                 <textarea
-                  rows={4}
+                  rows={5}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full border border-gray-300 px-4 py-2 rounded-lg text-sm"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-950"
                 />
               </div>
 
-              {!editingTask && <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">Feedback Date</label>
-                <input
-                  type="date"
-                  min={new Date().toISOString().split("T")[0]}
-                  value={feedbackDate}
-                  onChange={(e) => setFeedbackDate(e.target.value)}
-                  className="w-full border border-gray-300 px-4 py-2 rounded-lg text-sm"
-                />
-              </div>}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Feedback Date</label>
+                  <input
+                    type="date"
+                    min={new Date().toISOString().split("T")[0]}
+                    value={feedbackDate}
+                    onChange={(e) => setFeedbackDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-950"
+                  />
+                </div>
 
-              <div className="flex justify-end gap-4 pt-4">
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Status</label>
+                  <select
+                    value={taskStatus}
+                    onChange={(e) => setTaskStatus(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-950"
+                  >
+                    <option value="ONGOING">Ongoing</option>
+                    <option value="DELAYED">Delayed</option>
+                    <option value="COMPLETED">Completed</option>
+                  </select>
+                </div>
+              </div>
+
+              {isAdmin && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">Assign To</label>
+                  <select
+                    value={assignedTo}
+                    onChange={(e) => setAssignedTo(e.target.value ? Number(e.target.value) : "")}
+                    className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-950"
+                  >
+                    <option value="">Select a user</option>
+                    {userOptions.map((user) => (
+                      <option key={user.value} value={user.value}>
+                        {user.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
                   onClick={() => {
                     setShowCreate(false);
-                    resetForm();
+                    resetTaskForm();
                   }}
-
-                  className="border border-gray-300 px-5 py-2 rounded-lg text-sm"
+                  className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   Cancel
                 </button>
@@ -522,65 +789,54 @@ const Dashboard = () => {
                 <button
                   type="submit"
                   disabled={creating}
-                  className="bg-black text-white px-5 py-2 rounded-lg text-sm disabled:opacity-60"
+                  className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {creating ? editingTask
-                    ? "Updating..."
-                    : "Creating..."
+                  {creating
+                    ? editingTask
+                      ? "Updating..."
+                      : "Creating..."
                     : editingTask
                       ? "Update Task"
                       : "Create Task"}
-
                 </button>
               </div>
             </form>
-          </div>
+          </aside>
         </div>
       )}
 
       {showDelay && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/20 backdrop-blur-[2px]"
-            onClick={() => setShowDelay(false)}
-          />
-
-          <div className="relative bg-white w-[420px] rounded-2xl shadow-xl p-6">
-            <h2 className="text-lg font-semibold mb-4">
-              Delay Task
-            </h2>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 backdrop-blur-[2px]">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+            <h2 className="mb-5 text-xl font-semibold text-slate-950">Delay Task</h2>
 
             <form onSubmit={handleDelayTask} className="space-y-4">
               <div>
-                <label className="block text-sm mb-2">
-                  Reason
-                </label>
+                <label className="mb-2 block text-sm font-medium text-slate-700">Reason</label>
                 <textarea
-                  rows={3}
+                  rows={4}
                   value={delayReason}
                   onChange={(e) => setDelayReason(e.target.value)}
-                  className="w-full border px-3 py-2 rounded-lg text-sm"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-950"
                 />
               </div>
 
               <div>
-                <label className="block text-sm mb-2">
-                  New Date
-                </label>
+                <label className="mb-2 block text-sm font-medium text-slate-700">New Date</label>
                 <input
                   type="date"
                   min={new Date().toISOString().split("T")[0]}
                   value={delayDate}
                   onChange={(e) => setDelayDate(e.target.value)}
-                  className="w-full border px-3 py-2 rounded-lg text-sm"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-950"
                 />
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowDelay(false)}
-                  className="border px-4 py-2 rounded-lg text-sm"
+                  onClick={closeDelayModal}
+                  className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   Cancel
                 </button>
@@ -588,15 +844,16 @@ const Dashboard = () => {
                 <button
                   type="submit"
                   disabled={delaying}
-                  className="bg-black text-white px-4 py-2 rounded-lg text-sm disabled:opacity-60"
+                  className="rounded-xl bg-slate-950 px-4 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {delaying ? "Delaying..." : "Delay Task"}
+                  {delaying ? "Saving..." : "Delay Task"}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
 
     </div>
   );

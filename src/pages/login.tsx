@@ -1,125 +1,105 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { loginUser } from "../api/api";
+import { loginUser, persistAuthSession } from "../api/api";
 
 const Login = () => {
   const navigate = useNavigate();
-
-  const [form, setForm] = useState({
-    email: "",
-    password: "",
-  });
-
+  const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (localStorage.getItem("token")) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [navigate]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!form.email || !form.password) {
-      return toast.error("All fields are required");
+    if (!form.email.trim() || !form.password.trim()) {
+      toast.error("Email and password are required");
+      return;
     }
 
     try {
       setLoading(true);
+      const data = await loginUser({
+        email: form.email.trim(),
+        password: form.password,
+      });
 
-      const data = await loginUser(form);
-
-      // Example: store token if backend sends it
-      if (data.token) {
-        localStorage.setItem("token", data.token);
-      }
-
+      persistAuthSession(data);
       toast.success("Login successful");
-      navigate("/dashboard");
-
-    } catch (err: any) {
-      toast.error(err.message || "Login failed");
+      window.location.href = "/dashboard";
+    } catch (err) {
+      toast.error((err as Error).message || "Login failed");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex bg-gray-100">
-        
-
-      {/* Left Branding Section */}
-      <div className="hidden lg:flex w-1/2 bg-black text-white flex-col justify-center px-16">
-        <h1 className="text-4xl font-bold mb-6">FlowTasks</h1>
-        <p className="text-lg text-gray-300 leading-relaxed">
-          Organize your goals.
-          Track delays.
-          Build discipline.
+    <div className="min-h-screen bg-gray-100 lg:grid lg:grid-cols-2">
+      <section className="hidden bg-black px-16 text-white lg:flex lg:flex-col lg:justify-center">
+        <p className="mb-4 text-sm uppercase tracking-[0.3em] text-gray-400">FlowTasks</p>
+        <h1 className="mb-6 text-5xl font-semibold leading-tight">
+          Role-based task tracking for accountable teams.
+        </h1>
+        <p className="max-w-lg text-lg leading-8 text-gray-300">
+          Sign in to manage users, assign work, and keep task progress visible from one dashboard.
         </p>
-      </div>
+      </section>
 
-      {/* Right Form Section */}
-      <div className="flex flex-1 items-center justify-center px-6">
-        <div className="w-full max-w-md bg-white p-10 rounded-2xl shadow-xl">
-
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome Back
-          </h2>
-
-          <p className="text-gray-500 mb-6">
-            Log in to continue managing your tasks.
+      <section className="flex min-h-screen items-center justify-center px-6 py-10">
+        <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-xl">
+          <p className="mb-2 text-sm font-medium uppercase tracking-[0.25em] text-gray-400">
+            Welcome back
+          </p>
+          <h2 className="mb-2 text-3xl font-semibold text-gray-900">Sign in to FlowTasks</h2>
+          <p className="mb-8 text-sm text-gray-500">
+            Use your backend-issued credentials to continue.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Email</label>
               <input
                 type="email"
                 name="email"
                 value={form.email}
                 onChange={handleChange}
-                className="w-full border border-gray-300 focus:border-black focus:ring-0 rounded-lg px-4 py-3 outline-none transition"
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none transition focus:border-black"
                 placeholder="you@example.com"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
+              <label className="mb-2 block text-sm font-medium text-gray-700">Password</label>
               <input
                 type="password"
                 name="password"
                 value={form.password}
                 onChange={handleChange}
-                className="w-full border border-gray-300 focus:border-black focus:ring-0 rounded-lg px-4 py-3 outline-none transition"
-                placeholder="••••••••"
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 outline-none transition focus:border-black"
+                placeholder="Enter your password"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-black text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition disabled:opacity-60"
+              className="w-full rounded-xl bg-black py-3 font-medium text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
-
-          <p className="text-sm text-gray-500 mt-6 text-center">
-            Don’t have an account?{" "}
-            <span
-              onClick={() => navigate("/register")}
-              className="text-black font-medium cursor-pointer hover:underline"
-            >
-              Create one
-            </span>
-          </p>
         </div>
-      </div>
+      </section>
     </div>
   );
 };
