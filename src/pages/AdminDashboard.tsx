@@ -101,7 +101,7 @@ const AdminDashboard = () => {
 
             {/* HEADER */}
             <header className="border-b border-slate-200/80 bg-white/85 backdrop-blur-xl">
-                <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+                <div className="flex w-full items-center justify-between px-6 py-4">
                     <div>
                         <p className="text-xs uppercase tracking-[0.3em] text-slate-400">
                             FlowTasks Workspace
@@ -121,7 +121,7 @@ const AdminDashboard = () => {
             </header>
 
             {/* MAIN */}
-            <main className="mx-auto max-w-7xl px-6 py-6">
+            <main className="w-full px-4 sm:px-6 py-6 h-[calc(100vh-73px)]">
                 <section className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
 
                     {/* USERS */}

@@ -44,7 +44,6 @@ const TaskDetails = () => {
         setLoading(false);
       }
     };
-
     fetchTask();
   }, [id]);
 
@@ -65,18 +64,26 @@ const TaskDetails = () => {
   const badge = badgeStyles[task.status as keyof typeof badgeStyles] || "bg-gray-100 text-gray-600";
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(219,234,254,0.65),_rgba(248,250,252,1)_35%,_rgba(255,255,255,1)_100%)] p-4">
-      <div className="mx-auto flex max-w-7xl flex-col gap-4">
+    // FIX 1: h-screen + flex col + overflow-hidden — fills full viewport, no scroll on outer
+    <div className="h-screen flex flex-col overflow-hidden bg-[radial-gradient(circle_at_top,_rgba(219,234,254,0.65),_rgba(248,250,252,1)_35%,_rgba(255,255,255,1)_100%)]">
+
+      {/* FIX 2: removed max-w-7xl, full width, flex-1 fills remaining height */}
+      <div className="flex flex-col gap-3 h-full w-full px-4 sm:px-6 py-4 overflow-hidden">
+
         <button
           onClick={() => navigate(-1)}
-          className="w-fit rounded-full border border-sky-200 bg-white px-5 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-sky-300 hover:bg-sky-50 hover:text-slate-900"
+          className="w-fit shrink-0 rounded-full border border-sky-200 bg-white px-5 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-sky-300 hover:bg-sky-50 hover:text-slate-900"
         >
           {"<- Back to Tasks"}
         </button>
 
-        <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
-          <section className="space-y-6">
-            <div className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm">
+        {/* FIX 3: flex-1 + min-h-0 so grid fills all remaining height */}
+        <div className="grid gap-4 flex-1 min-h-0 xl:grid-cols-[2fr_1fr]">
+
+          {/* FIX 4: left section scrolls independently */}
+          <section className="flex flex-col gap-4 overflow-y-auto min-h-0 pr-1">
+
+            <div className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm shrink-0">
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <p className="text-xs uppercase tracking-[0.28em] text-sky-500">
@@ -89,7 +96,6 @@ const TaskDetails = () => {
                     {task.description || "No description provided"}
                   </p>
                 </div>
-
                 <div className="flex flex-col items-end gap-2">
                   {task.is_overdue === 1 && (
                     <div className="flex items-center gap-2 text-sm font-medium text-rose-500">
@@ -104,7 +110,7 @@ const TaskDetails = () => {
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 shrink-0">
               {[
                 ["Created", new Date(task.created_at).toLocaleString()],
                 ["Last Updated", new Date(task.updated_at).toLocaleString()],
@@ -113,83 +119,51 @@ const TaskDetails = () => {
                 ["Created By", task.creator_name || "-"],
                 ["Assigned To", task.assignee_name || "-"],
               ].map(([label, value], index) => (
-                <div
-                  key={index}
-                  className="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm"
-                >
-                  <p className="mb-1 text-xs uppercase tracking-[0.2em] text-slate-400">
-                    {label}
-                  </p>
-                  <p className="font-medium text-slate-900">
-                    {value}
-                  </p>
+                <div key={index} className="rounded-2xl border border-sky-100 bg-white p-5 shadow-sm">
+                  <p className="mb-1 text-xs uppercase tracking-[0.2em] text-slate-400">{label}</p>
+                  <p className="font-medium text-slate-900">{value}</p>
                 </div>
               ))}
             </div>
 
-            {/* STATUS SUMMARY */}
-            <div className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm">
-              <p className="text-xs uppercase tracking-[0.28em] text-sky-500">
-                Status Summary
-              </p>
-
+            <div className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm shrink-0">
+              <p className="text-xs uppercase tracking-[0.28em] text-sky-500">Status Summary</p>
               <div className="mt-4 grid gap-4 md:grid-cols-3">
                 <div className="rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-100">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                    Current Status
-                  </p>
-                  <p className="mt-2 text-xl font-semibold text-slate-900">
-                    {task.status}
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Current Status</p>
+                  <p className="mt-2 text-xl font-semibold text-slate-900">{task.status}</p>
+                </div>
+                <div className="rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-100">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Completed At</p>
+                  <p className="mt-2 text-sm font-medium text-slate-700">
+                    {task.completed_at ? new Date(task.completed_at).toLocaleString() : "Not completed yet"}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-100">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                    Completed At
-                  </p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Overdue State</p>
                   <p className="mt-2 text-sm font-medium text-slate-700">
-                    {task.completed_at
-                      ? new Date(task.completed_at).toLocaleString()
-                      : "Not completed yet"}
-                  </p>
-                </div>
-                <div className="rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-100">
-                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
-                    Overdue State
-                  </p>
-                  <p className="mt-2 text-sm font-medium text-slate-700">
-                    {task.is_overdue === 1
-                      ? "Requires attention"
-                      : "Within expected timeline"}
+                    {task.is_overdue === 1 ? "Requires attention" : "Within expected timeline"}
                   </p>
                 </div>
               </div>
             </div>
+
           </section>
 
-          {/* RIGHT SIDE */}
-          <aside className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm max-h-[540px] flex flex-col">
-
-            <h2 className="mb-4 text-xl font-semibold text-slate-900">
-              Delay History
-            </h2>
-
-            <div className="flex-1 overflow-y-auto pr-2">
+          {/* FIX 5: right aside — removed max-h-[540px], now fills full height dynamically */}
+          <aside className="rounded-3xl border border-sky-100 bg-white p-6 shadow-sm flex flex-col min-h-0 overflow-hidden">
+            <h2 className="mb-4 text-xl font-semibold text-slate-900 shrink-0">Delay History</h2>
+            <div className="flex-1 overflow-y-auto pr-2 min-h-0">
               {task.delays.length === 0 ? (
-                <p className="text-sm text-slate-500">
-                  No delays recorded.
-                </p>
+                <p className="text-sm text-slate-500">No delays recorded.</p>
               ) : (
                 <div className="space-y-5">
                   {task.delays.map((delay) => (
-                    <article
-                      key={delay.id}
-                      className="rounded-2xl border border-sky-100 bg-sky-50 p-4">
+                    <article key={delay.id} className="rounded-2xl border border-sky-100 bg-sky-50 p-4">
                       <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
                         {new Date(delay.created_at).toLocaleString()}
                       </p>
-                      <p className="mt-2 font-medium text-slate-900">
-                        {delay.reason}
-                      </p>
+                      <p className="mt-2 font-medium text-slate-900">{delay.reason}</p>
                       <p className="mt-2 text-sm text-slate-600">
                         {new Date(delay.old_date).toLocaleDateString()} to{" "}
                         {new Date(delay.new_date).toLocaleDateString()}
@@ -200,6 +174,7 @@ const TaskDetails = () => {
               )}
             </div>
           </aside>
+
         </div>
       </div>
     </div>
