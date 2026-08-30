@@ -1,4 +1,4 @@
-# FlowTasks – Frontend
+# FlowTasks â€“ Frontend
 
 ## Overview
 FlowTasks is a full-stack task accountability system that helps users manage tasks, track delays, and monitor overdue work.
@@ -100,3 +100,29 @@ https://github.com/Vamsidhar3081/flowtasks-backend
 ## Author
 
 Vamsidhar Reddy Dandu
+## AI Task Assistant
+
+The dashboard includes an AI Assistant powered by a Groq-hosted language model. Users can ask natural-language questions about tasks and users, for example:
+
+- Which tasks assigned to Mouser are overdue?
+- Show me all tasks with more than 2 delays.
+- Summarize why the dashboard task got delayed.
+
+The assistant converts the question into structured task filters, queries the backend, and displays readable task results. It supports task lists, status and overdue questions, delay-count conditions, user statistics, and delay summaries.
+
+### AI Configuration
+
+The AI key is used only by the backend and must never be committed to GitHub or exposed as a `VITE_` frontend variable. Configure these variables in the backend hosting provider:
+
+```env
+OPENAI_API_KEY=your_groq_api_key
+OPENAI_MODEL=openai/gpt-oss-120b
+OPENAI_BASE_URL=https://api.groq.com/openai/v1
+```
+
+For local development, keep the same values in the backend `.env` file. Configure the deployed backend URL in Vercel as `VITE_API_URL`:
+
+```env
+VITE_API_URL=https://your-backend-domain.com/api/
+```
+
