@@ -25,3 +25,29 @@ body,
 body {
   min-height: 100vh;
 }
+
+input.date-input {
+  box-sizing: border-box;
+  min-height: 48px;
+  color-scheme: light;
+  text-align: left;
+  touch-action: manipulation;
+}
+
+input.date-input::-webkit-date-and-time-value {
+  min-height: 1.5rem;
+  text-align: left;
+}
+
+input.date-input::-webkit-calendar-picker-indicator {
+  margin-left: auto;
+  padding: 4px;
+}
+
+.react-datepicker-popper {
+  z-index: 100;
+}
+
+.react-datepicker__input-container {
+  display: block;
+}

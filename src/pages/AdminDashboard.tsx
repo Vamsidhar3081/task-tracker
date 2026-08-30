@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import { createTask } from "../api/api";
 import toast from "react-hot-toast";
 import {
@@ -8,6 +10,13 @@ import {
     isAdminRole,
 } from "../api/api";
 import type { UserSummary } from "../api/api";
+
+const formatDateValue = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+};
 
 const AdminDashboard = () => {
     const navigate = useNavigate();
@@ -263,12 +272,16 @@ const AdminDashboard = () => {
                             <div className="grid gap-4 md:grid-cols-2">
                                 <div>
                                     <label className="mb-2 block text-sm font-medium text-slate-700">Feedback Date</label>
-                                    <input
-                                        type="date"
-                                        min={new Date().toISOString().split("T")[0]}
-                                        value={feedbackDate}
-                                        onChange={(e) => setFeedbackDate(e.target.value)}
-                                        className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-slate-950"
+                                    <DatePicker
+                                        selected={feedbackDate ? new Date(`${feedbackDate}T00:00:00`) : null}
+                                        onChange={(date: Date | null) => setFeedbackDate(date ? formatDateValue(date) : "")}
+                                        minDate={new Date()}
+                                        dateFormat="dd/MM/yyyy"
+                                        placeholderText="Select feedback date"
+                                        popperPlacement="top-start"
+                                        portalId="root"
+                                        wrapperClassName="block w-full"
+                                        className="date-input w-full min-w-0 max-w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-slate-950"
                                     />
                                 </div>
 

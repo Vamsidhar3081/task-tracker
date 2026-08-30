@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import toast from "react-hot-toast";
 import {
   clearAuthSession,
@@ -15,6 +18,7 @@ import {
   updateTask,
 } from "../api/api";
 import type { TaskItem, UserSummary } from "../api/api";
+import AiAssistantModal from "../components/AiAssistantModal";
 
 interface MetaState {
   total: number;
@@ -25,9 +29,26 @@ interface MetaState {
 
 const initialMeta: MetaState = { total: 0, page: 1, limit: 10, totalPages: 1 };
 
+const formatDateValue = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getDateValue = (value?: string) =>
+  value ? new Date(`${value.slice(0, 10)}T00:00:00`) : new Date();
+
+const getNextDate = (value?: string) => {
+  const date = getDateValue(value);
+  date.setDate(date.getDate() + 1);
+  return date;
+};
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const mobileMenuRef = useRef<HTMLDivElement | null>(null);
   const role = getStoredRole()?.toUpperCase() || "";
   const currentUserId = getStoredUserId();
   const isAdmin = isAdminRole();
@@ -57,7 +78,18 @@ const Dashboard = () => {
   const [delayTaskId, setDelayTaskId] = useState<number | null>(null);
   const [delaying, setDelaying] = useState(false);
   const [menuDir, setMenuDir] = useState<"up" | "down">("down");
+  const [mobileMenuPosition, setMobileMenuPosition] = useState<{ left: number; top?: number; bottom?: number }>({ left: 0 });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showAiAssistant, setShowAiAssistant] = useState(false);
+
+  const minimumFeedbackDate = new Date();
+
+  const delayingTask = delayTaskId !== null
+    ? tasks.find((task) => task.id === delayTaskId)
+    : undefined;
+  const minimumDelayDate = delayingTask?.feedback_date
+    ? getNextDate(delayingTask.feedback_date)
+    : new Date();
 
   const userOptions = useMemo(
     () => users.map((u) => ({ value: u.id, label: `${u.name} (${u.email})` })),
@@ -127,7 +159,8 @@ const Dashboard = () => {
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpenMenuId(null);
+      const target = e.target as Node;
+      if (!menuRef.current?.contains(target) && !mobileMenuRef.current?.contains(target)) setOpenMenuId(null);
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -327,7 +360,14 @@ const Dashboard = () => {
                 onChange={(e) => setSearchInput(e.target.value)}
                 className="flex-1 min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs outline-none focus:border-slate-950"
               />
-              <div className="flex gap-2 flex-wrap sm:flex-nowrap shrink-0">
+              <div className="ml-auto flex gap-2 flex-wrap sm:flex-nowrap shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowAiAssistant(true)}
+                  className="w-full rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-violet-700 transition hover:border-violet-300 hover:bg-violet-100 sm:w-auto"
+                >
+                  AI Assistant
+                </button>
                 <select
                   value={status}
                   onChange={(e) => { setPage(1); setStatus(e.target.value); }}
@@ -403,7 +443,14 @@ const Dashboard = () => {
                         <button
                           onClick={(e) => {
                             const rect = e.currentTarget.getBoundingClientRect();
-                            setMenuDir(window.innerHeight - rect.bottom < 160 ? "up" : "down");
+                            const direction = window.innerHeight - rect.bottom < 160 ? "up" : "down";
+                            setMenuDir(direction);
+                            setMobileMenuPosition({
+                              left: Math.min(rect.left, window.innerWidth - 164),
+                              ...(direction === "up"
+                                ? { bottom: window.innerHeight - rect.top + 4 }
+                                : { top: rect.bottom + 4 }),
+                            });
                             setOpenMenuId((p) => (p === task.id ? null : task.id));
                           }}
                           className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
@@ -411,20 +458,27 @@ const Dashboard = () => {
                           Actions ▾
                         </button>
                         {openMenuId === task.id && (
-                          <div className={`absolute left-0 z-50 w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg ${menuDir === "up" ? "bottom-full mb-1" : "top-full mt-1"}`}>
-                            {task.status !== "COMPLETED" && (
-                              <button onClick={() => { handleCompleteTask(task.id); setOpenMenuId(null); }}
-                                className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-emerald-700 hover:bg-slate-50">Mark Complete</button>
-                            )}
-                            <button onClick={() => { openEditDrawer(task); setOpenMenuId(null); }}
-                              className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50">Edit Task</button>
-                            <button onClick={() => {
-                              if (task.status === "COMPLETED") { toast.error("Cannot delay a completed task"); return; }
-                              setDelayTaskId(task.id); setShowDelay(true); setOpenMenuId(null);
-                            }} className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-amber-700 hover:bg-slate-50">Delay Task</button>
-                            <button onClick={() => { handleDeleteTask(task.id); setOpenMenuId(null); }}
-                              className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-rose-600 hover:bg-slate-50">Delete Task</button>
-                          </div>
+                          createPortal(
+                            <div
+                              ref={mobileMenuRef}
+                              style={{ left: mobileMenuPosition.left, top: mobileMenuPosition.top, bottom: mobileMenuPosition.bottom }}
+                              className="fixed z-[100] w-40 rounded-xl border border-slate-200 bg-white p-1.5 shadow-lg"
+                            >
+                              {task.status !== "COMPLETED" && (
+                                <button onClick={() => { handleCompleteTask(task.id); setOpenMenuId(null); }}
+                                  className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-emerald-700 hover:bg-slate-50">Mark Complete</button>
+                              )}
+                              <button onClick={() => { openEditDrawer(task); setOpenMenuId(null); }}
+                                className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-slate-700 hover:bg-slate-50">Edit Task</button>
+                              <button onClick={() => {
+                                if (task.status === "COMPLETED") { toast.error("Cannot delay a completed task"); return; }
+                                setDelayTaskId(task.id); setShowDelay(true); setOpenMenuId(null);
+                              }} className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-amber-700 hover:bg-slate-50">Delay Task</button>
+                              <button onClick={() => { handleDeleteTask(task.id); setOpenMenuId(null); }}
+                                className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-rose-600 hover:bg-slate-50">Delete Task</button>
+                            </div>,
+                            document.body
+                          )
                         )}
                       </div>
                     </div>
@@ -558,7 +612,7 @@ const Dashboard = () => {
       {showCreate && (
         <div className="fixed inset-0 z-50 flex bg-black/20 backdrop-blur-[2px]">
           <div className="flex-1" onClick={() => { setShowCreate(false); resetTaskForm(); }} />
-          <aside className="h-full w-full max-w-xl overflow-y-auto bg-white p-5 sm:p-8 shadow-2xl">
+          <aside className="h-full min-w-0 w-full max-w-xl overflow-y-auto bg-white p-5 sm:p-8 shadow-2xl">
             <h2 className="mb-1 text-xl sm:text-2xl font-semibold text-slate-950">
               {editingTask ? "Update Task" : "Create New Task"}
             </h2>
@@ -580,9 +634,17 @@ const Dashboard = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-700">Feedback Date</label>
-                  <input type="date" min={new Date().toISOString().split("T")[0]} value={feedbackDate}
-                    onChange={(e) => setFeedbackDate(e.target.value)}
-                    className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950" />
+                  <DatePicker
+                    selected={feedbackDate ? getDateValue(feedbackDate) : null}
+                    onChange={(date: Date | null) => setFeedbackDate(date ? formatDateValue(date) : "")}
+                    minDate={minimumFeedbackDate}
+                    dateFormat="dd/MM/yyyy"
+                    placeholderText="Select feedback date"
+                    popperPlacement="top-start"
+                    portalId="root"
+                    wrapperClassName="block w-full"
+                    className="date-input w-full min-w-0 max-w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
+                  />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-slate-700">Status</label>
@@ -620,7 +682,7 @@ const Dashboard = () => {
       {/* ── DELAY MODAL ── */}
       {showDelay && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 px-4 backdrop-blur-[2px]">
-          <div className="w-full max-w-md rounded-3xl bg-white p-5 sm:p-6 shadow-xl">
+          <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-5 sm:max-h-none sm:p-6 shadow-xl">
             <h2 className="mb-4 text-lg sm:text-xl font-semibold text-slate-950">Delay Task</h2>
             <form onSubmit={handleDelayTask} className="space-y-4">
               <div>
@@ -630,9 +692,17 @@ const Dashboard = () => {
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">New Date</label>
-                <input type="date" min={new Date().toISOString().split("T")[0]} value={delayDate}
-                  onChange={(e) => setDelayDate(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950" />
+                <DatePicker
+                  selected={delayDate ? getDateValue(delayDate) : null}
+                  onChange={(date: Date | null) => setDelayDate(date ? formatDateValue(date) : "")}
+                  minDate={minimumDelayDate}
+                  dateFormat="dd/MM/yyyy"
+                  placeholderText="Select new date"
+                  popperPlacement="top-start"
+                  portalId="root"
+                  wrapperClassName="block w-full"
+                  className="date-input w-full min-w-0 max-w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none focus:border-slate-950"
+                />
               </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={closeDelayModal}
@@ -646,6 +716,8 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
+      {showAiAssistant && <AiAssistantModal onClose={() => setShowAiAssistant(false)} />}
     </div>
   );
 };

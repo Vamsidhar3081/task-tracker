@@ -112,8 +112,8 @@ const TaskDetails = () => {
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 shrink-0">
               {[
-                ["Created", new Date(task.created_at).toLocaleString()],
-                ["Last Updated", new Date(task.updated_at).toLocaleString()],
+                ["Created", new Date(task.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })],
+                ["Last Updated", new Date(task.updated_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })],
                 ["Feedback Date", new Date(task.feedback_date).toLocaleDateString()],
                 ["Delay Count", task.delay_count],
                 ["Created By", task.creator_name || "-"],
@@ -136,7 +136,7 @@ const TaskDetails = () => {
                 <div className="rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-100">
                   <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Completed At</p>
                   <p className="mt-2 text-sm font-medium text-slate-700">
-                    {task.completed_at ? new Date(task.completed_at).toLocaleString() : "Not completed yet"}
+                    {task.completed_at ? new Date(task.completed_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "Not completed yet"}
                   </p>
                 </div>
                 <div className="rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-100">
@@ -161,7 +161,7 @@ const TaskDetails = () => {
                   {task.delays.map((delay) => (
                     <article key={delay.id} className="rounded-2xl border border-sky-100 bg-sky-50 p-4">
                       <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                        {new Date(delay.created_at).toLocaleString()}
+                        {new Date(delay.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}
                       </p>
                       <p className="mt-2 font-medium text-slate-900">{delay.reason}</p>
                       <p className="mt-2 text-sm text-slate-600">

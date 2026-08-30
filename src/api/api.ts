@@ -288,3 +288,25 @@ export const getTaskById = async (taskId: number) => {
     return handleError(err, "Failed to fetch task");
   }
 };
+
+export type AiTaskQueryResponse = {
+  intent?: string;
+  matched_user?: string | null;
+  corrected_from?: string | null;
+  summary?: string;
+  message?: string;
+  suggestions?: string[];
+  tasks?: Array<Partial<TaskItem> & { delay_count?: number }>;
+  task?: Partial<TaskItem> & { delay_count?: number };
+  count?: number;
+  stats?: { total_tasks: number; ongoing_tasks: number; delayed_tasks: number; completed_tasks: number; overdue_tasks: number };
+};
+
+export const queryTasksWithAI = async (question: string) => {
+  try {
+    const res = await axios.post("/ai/query", { question });
+    return res.data as AiTaskQueryResponse;
+  } catch (err) {
+    return handleError(err, "Unable to process the AI task query");
+  }
+};
