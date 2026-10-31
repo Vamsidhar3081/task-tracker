@@ -25,7 +25,7 @@ export default function AiAssistantModal({ onClose }: Props) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4" onMouseDown={onClose}>
       <div
-        className="flex h-[32rem] max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col rounded-xl bg-white p-5 shadow-xl"
+        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-y-auto rounded-xl bg-white p-5 shadow-xl"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="mb-3 flex shrink-0 items-center justify-between">
@@ -54,13 +54,18 @@ export default function AiAssistantModal({ onClose }: Props) {
             </button>
           </div>
         </form>
-        <div aria-live="polite" className="mt-4 min-h-0 flex-1 overflow-auto rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
-          {error ? (
-            <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-600">{error}</p>
-          ) : result ? (
-            answerOnly ? <Markdown text={result.answer} /> : resultContent
-          ) : (
-            <p className="text-slate-400">{loading ? "Searching tasks..." : "Your task results will appear here."}</p>
+        <div
+          aria-live="polite"
+          className={`overflow-hidden transition-[max-height] duration-300 ease-out motion-reduce:transition-none ${result || error ? "max-h-[17rem]" : "max-h-0"}`}
+        >
+          {(result || error) && (
+            <div className="mt-4 max-h-64 overflow-auto rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+              {error ? (
+                <p role="alert" className="rounded-lg bg-red-50 p-3 text-red-600">{error}</p>
+              ) : (
+                answerOnly ? <Markdown text={result?.answer} /> : resultContent
+              )}
+            </div>
           )}
         </div>
       </div>
