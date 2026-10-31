@@ -1,3 +1,86 @@
 #root {
   min-height: 100vh;
 }
+
+.dashboard-table-card {
+  border-radius: 10px;
+}
+
+.dashboard-stat-card {
+  border-radius: 6px;
+}
+
+.dashboard-filter-card {
+  border-radius: 8px;
+}
+
+.dashboard-ambient {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.dashboard-ambient-orb {
+  position: absolute;
+  display: block;
+  width: clamp(20rem, 42vw, 42rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.42;
+  will-change: transform;
+  animation: dashboard-ambient-drift 24s ease-in-out infinite alternate;
+}
+
+.dashboard-ambient-orb-one {
+  top: -18rem;
+  left: 8%;
+  background: radial-gradient(circle, rgba(191, 219, 254, 0.9), rgba(219, 234, 254, 0));
+}
+
+.dashboard-ambient-orb-two {
+  right: -12rem;
+  bottom: -22rem;
+  background: radial-gradient(circle, rgba(196, 181, 253, 0.62), rgba(224, 231, 255, 0));
+  animation-delay: -12s;
+  animation-duration: 30s;
+}
+
+@keyframes dashboard-ambient-drift {
+  from {
+    transform: translate3d(-3%, -2%, 0) scale(0.96);
+  }
+
+  to {
+    transform: translate3d(5%, 6%, 0) scale(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-ambient-orb {
+    animation: none;
+  }
+}
+
+.ai-assistant-gradient-button {
+  animation: ai-assistant-gradient-shift 5s ease infinite;
+}
+
+@keyframes ai-assistant-gradient-shift {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-assistant-gradient-button {
+    animation: none;
+  }
+}

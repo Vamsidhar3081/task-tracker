@@ -295,6 +295,7 @@ export type AiTaskQueryResponse = {
   corrected_from?: string | null;
   summary?: string;
   message?: string;
+  answer?: string;
   suggestions?: string[];
   tasks?: Array<Partial<TaskItem> & { delay_count?: number }>;
   task?: Partial<TaskItem> & { delay_count?: number };
@@ -308,5 +309,22 @@ export const queryTasksWithAI = async (question: string) => {
     return res.data as AiTaskQueryResponse;
   } catch (err) {
     return handleError(err, "Unable to process the AI task query");
+  }
+};
+
+export type TaskStats = {
+  total_tasks: number;
+  completed_tasks: number;
+  delayed_tasks: number;
+  ongoing_tasks: number;
+  overdue_tasks: number;
+};
+
+export const getTaskStats = async (params: { assignedTo?: number | "" } = {}) => {
+  try {
+    const res = await axios.get("/auth/taskstats", { params });
+    return res.data as TaskStats;
+  } catch (err) {
+    return handleError(err, "Failed to fetch task stats");
   }
 };

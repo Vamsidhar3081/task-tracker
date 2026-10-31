@@ -12,12 +12,13 @@ import {
   deleteTask,
   getStoredRole,
   getStoredUserId,
+  getTaskStats,
   getTasks,
   getUsers,
   isAdminRole,
   updateTask,
 } from "../api/api";
-import type { TaskItem, UserSummary } from "../api/api";
+import type { TaskItem, TaskStats,UserSummary } from "../api/api";
 import AiAssistantModal from "../components/AiAssistantModal";
 
 interface MetaState {
@@ -60,6 +61,7 @@ const Dashboard = () => {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
+  const [stats, setStats] = useState<TaskStats | null>(null);
   const [showOverdue, setShowOverdue] = useState(false);
   const [meta, setMeta] = useState<MetaState>(initialMeta);
   const [assignedFilter, setAssignedFilter] = useState<number | "">("");
@@ -154,7 +156,21 @@ const Dashboard = () => {
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
+    const fetchStats = useCallback(async () => {
+    try {
+      const data = await getTaskStats({
+        assignedTo: isAdmin && assignedFilter !== "" ? assignedFilter : "",
+      });
+      setStats(data);
+    } catch (err) {
+      console.error("Failed to fetch task stats", err);
+    }
+  }, [assignedFilter, isAdmin]);
+
+  
+
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
+  useEffect(() => { fetchStats(); }, [fetchStats, tasks]);
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   useEffect(() => {
@@ -237,9 +253,9 @@ const Dashboard = () => {
     } catch (err) { toast.error((err as Error).message || "Something went wrong"); }
   };
 
-  const completedTasks = tasks.filter((t) => t.status === "COMPLETED").length;
-  const delayedTasks   = tasks.filter((t) => t.status === "DELAYED").length;
-  const overdueTasks   = tasks.filter((t) => t.is_overdue === 1).length;
+  const completedTasks = stats?.completed_tasks ?? 0;
+  const delayedTasks   = stats?.delayed_tasks ?? 0;
+  const overdueTasks   = stats?.overdue_tasks ?? 0;
 
   const statusBadge = (s: string) => {
     if (s === "COMPLETED") return "bg-emerald-100 text-emerald-700";
@@ -249,15 +265,19 @@ const Dashboard = () => {
 
   return (
     // ── Full viewport height, flex column, no page scroll ──
-    <div className="h-screen flex flex-col overflow-hidden bg-[radial-gradient(circle_at_20%_20%,rgba(199,210,254,0.6),transparent_40%),radial-gradient(circle_at_80%_0%,rgba(147,197,253,0.5),transparent_40%),radial-gradient(circle_at_50%_100%,rgba(224,231,255,0.6),transparent_50%)]">
+    <div className="premium-dashboard relative isolate h-screen flex flex-col overflow-hidden bg-[linear-gradient(120deg,_#f6f7ff_0%,_#e7f1ff_52%,_#f8fbff_100%)]">
+      <div className="dashboard-ambient" aria-hidden="true">
+        <span className="dashboard-ambient-orb dashboard-ambient-orb-one" />
+        <span className="dashboard-ambient-orb dashboard-ambient-orb-two" />
+      </div>
 
       {/* ── HEADER (fixed height) ── */}
-      <header className="shrink-0 border-b border-slate-200/80 bg-white/90 backdrop-blur-sm z-30">
+      <header className="relative z-30 shrink-0 border-b border-slate-200/80 bg-white/90 backdrop-blur-sm">
         <div className="w-full px-4 sm:px-6">
           <div className="flex items-center justify-between h-14 gap-4">
             {/* Title */}
             <div className="min-w-0">
-              <p className="text-[9px] uppercase tracking-[0.3em] text-slate-400 leading-none">Signed in as {role}.</p>
+              <p className="text-[9px] uppercase tracking-[0.3em] text-slate-400 leading-none">FlowTasks / {role} workspace</p>
               <h1 className="text-base sm:text-xl lg:text-2xl font-semibold text-slate-950 leading-tight truncate">
                 {isAdmin ? "Admin Task Workspace" : "My Tasks"}
               </h1>
@@ -292,7 +312,7 @@ const Dashboard = () => {
               className="sm:hidden p-2 rounded-lg border border-slate-300 bg-white"
               onClick={() => setMobileMenuOpen((v) => !v)}
             >
-              <svg className="w-5 h-5 text-slate-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {mobileMenuOpen
                   ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />}
@@ -329,7 +349,7 @@ const Dashboard = () => {
       </header>
 
       {/* ── MAIN CONTENT (flex-1 = takes all remaining height) ── */}
-      <main className="flex-1 overflow-hidden">
+      <main className="relative z-10 flex-1 overflow-hidden">
         <div className="w-full h-full px-3 sm:px-4 lg:px-6 py-3 flex flex-col gap-2">
 
           {/* ── STATS (shrink-0 = never grows or shrinks) ── */}
@@ -340,7 +360,7 @@ const Dashboard = () => {
               { label: "Delayed",      sub: "Revised feedback dates",                   val: delayedTasks,  color: "text-amber-600"   },
               { label: "Overdue",      sub: "Needs attention",                          val: overdueTasks,  color: "text-rose-600"    },
             ].map(({ label, sub, val, color }) => (
-              <article key={label} className="rounded-xl border border-white/70 bg-white/80 px-4 py-2.5 shadow-sm backdrop-blur flex items-center justify-between gap-3">
+              <article key={label} className="dashboard-stat-card border border-white/70 bg-white/80 px-4 py-2.5 shadow-sm backdrop-blur flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[9px] sm:text-[10px] uppercase tracking-[0.2em] text-slate-400 leading-tight">{label}</p>
                   <p className="mt-0.5 text-[10px] sm:text-xs text-slate-500 truncate">{sub}</p>
@@ -351,20 +371,20 @@ const Dashboard = () => {
           </div>
 
           {/* ── FILTERS (shrink-0) ── */}
-          <div className="shrink-0 rounded-lg border border-white/70 bg-white/85 px-3 py-2 shadow-sm backdrop-blur">
+          <div className="dashboard-filter-card shrink-0 border border-white/70 bg-white/85 px-3 py-2 shadow-sm backdrop-blur">
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
                 placeholder="Search tasks by title, description, or assignee"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                className="flex-1 min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs outline-none focus:border-slate-950"
+                className="flex-1 min-w-0 rounded border border-slate-300 bg-white px-3 py-1.5 text-xs outline-none focus:border-slate-950"
               />
               <div className="ml-auto flex gap-2 flex-wrap sm:flex-nowrap shrink-0">
                 <button
                   type="button"
                   onClick={() => setShowAiAssistant(true)}
-                  className="w-full rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium whitespace-nowrap text-violet-700 transition hover:border-violet-300 hover:bg-violet-100 sm:w-auto"
+                  className="ai-assistant-gradient-button w-full rounded-lg border border-blue-400 bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400 bg-[length:200%_200%] px-3 py-1.5 text-xs font-medium whitespace-nowrap text-white transition hover:border-blue-300 hover:from-blue-600 hover:via-indigo-600 hover:to-cyan-500 sm:w-auto"
                 >
                   AI Assistant
                 </button>
@@ -407,7 +427,7 @@ const Dashboard = () => {
           </div>
 
           {/* ── TABLE CARD (flex-1 + overflow-hidden = fills ALL remaining space) ── */}
-          <div className="flex-1 overflow-hidden rounded-xl border border-white/70 bg-white/90 shadow-sm backdrop-blur flex flex-col min-h-0 max-h-full">
+          <div className="dashboard-table-card flex-1 overflow-hidden border border-white/70 bg-white/90 shadow-sm backdrop-blur flex flex-col min-h-0 max-h-full">
 
             {/* ── MOBILE CARDS ── */}
             <div className="md:hidden flex-1 overflow-y-auto px-3 py-2">
@@ -572,13 +592,6 @@ const Dashboard = () => {
                         </tr>
                       ))
                     )}
-                    {!loading && tasks.length < 10 &&
-                      Array.from({ length: 10 - tasks.length }).map((_, i) => (
-                        <tr key={`filler-${i}`} className="border-b border-slate-100">
-                          <td className="px-4 py-[18.5px]" colSpan={isAdmin ? 7 : 6}>&nbsp;</td>
-                        </tr>
-                      ))
-                    }
                   </tbody>
                 </table>
               </div>
