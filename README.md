@@ -1,10 +1,12 @@
-# FlowTasks â€“ Frontend
+# FlowTasks – Frontend
 
 ## Overview
+
 FlowTasks is a full-stack task accountability system that helps users manage tasks, track delays, and monitor overdue work.
 
-This frontend application provides a responsive dashboard where users can create tasks, delay tasks with a reason, update them, and mark them as completed.  
-The application communicates with a Node.js and MySQL backend API.
+This frontend is a responsive dashboard where users create tasks, delay them with a reason, update them, and mark them as completed. Admins can manage users and see everyone's tasks. The dashboard also includes an **AI Assistant** that answers natural-language questions about tasks.
+
+The app talks to a Node.js and MySQL backend API.
 
 ---
 
@@ -15,20 +17,83 @@ The application communicates with a Node.js and MySQL backend API.
 - Vite
 - Tailwind CSS
 - Axios
-- React Query
+- React Router
+- react-datepicker, react-hot-toast
+- react-markdown with remark-gfm (renders the assistant's answers)
 
 ---
 
 ## Features
 
 - User registration and login
-- Create, update, and delete tasks
-- Delay tasks with reason and new date
-- Track task status (Today, Delayed, Completed)
+- Roles: **Admin** and **User** (admins create users, assign tasks and see all tasks)
+- Create, update and delete tasks
+- Delay tasks with a reason and a new date
+- Task statuses: Ongoing, Delayed, Completed
 - Overdue task detection
-- Pagination and filtering
-- Responsive dashboard UI
-- Task options menu (update, delay, delete)
+- Dashboard statistics (total, completed, delayed, overdue) calculated by the server across all tasks, not just the current page
+- Pagination, search and filtering
+- Responsive dashboard UI (table on desktop, cards on mobile)
+- Task options menu (complete, edit, delay, delete)
+- AI Assistant (see below)
+
+---
+
+## AI Task Assistant
+
+The dashboard has an **AI Assistant** where users type a question in plain language, for example:
+
+- Which tasks assigned to Mouser are overdue?
+- Show me all tasks with more than 2 delays.
+- How many tasks are there, and how many are completed, delayed and overdue?
+- Why do tasks keep getting delayed?
+- Which tasks are related to payment problems?
+- Summarize why the dashboard task got delayed.
+
+### What the user sees
+
+- **Task questions:** matching tasks appear as cards with status, assignee, delay count and description.
+- **Counts and statistics:** the assistant's written answer is shown, for example a list of totals.
+- **Delay summaries and patterns:** a written summary, rendered as Markdown (tables, bullet points and bold text display properly).
+- **Unclear names:** if a name is misspelled or ambiguous, the assistant asks for clarification instead of guessing.
+
+### How it works
+
+The frontend only sends the question to the backend and displays the response. All AI work happens in the backend:
+
+1. A language model turns the question into structured filters and chooses a tool.
+2. The backend validates those filters, applies the user's permissions in SQL, and runs the query.
+3. The model turns the result into a short answer, and the frontend shows both the answer and the full task data.
+
+For topic questions such as "related to payment problems", the backend also uses semantic search (embeddings) to find tasks by meaning.
+
+### AI configuration
+
+The AI key is used only by the backend. It must never be committed to GitHub or exposed as a `VITE_` frontend variable. Configure these variables in the backend hosting provider:
+
+```env
+OPENAI_API_KEY=your_groq_api_key
+OPENAI_MODEL=openai/gpt-oss-120b
+OPENAI_BASE_URL=https://api.groq.com/openai/v1
+```
+
+For local development, keep the same values in the backend `.env` file.
+
+---
+
+## Environment Variables
+
+Create a `.env` file in the frontend folder:
+
+```env
+VITE_API_URL=http://localhost:5000/api/
+```
+
+For the deployed app, set `VITE_API_URL` in Vercel to your deployed backend URL:
+
+```env
+VITE_API_URL=https://your-backend-domain.com/api/
+```
 
 ---
 
@@ -36,6 +101,11 @@ The application communicates with a Node.js and MySQL backend API.
 
 ### Dashboard
 ![Dashboard](./screenshots/Dashboard.png)
+
+<!-- Add an AI Assistant screenshot, then uncomment this line:
+### AI Assistant
+![AI Assistant](./screenshots/AI-assistant.png)
+-->
 
 ### Create Account
 ![Create Account](./screenshots/Create-account.png)
@@ -59,40 +129,43 @@ The application communicates with a Node.js and MySQL backend API.
 
 ## Installation
 
-Clone the repository
+Clone the repository:
+
+```bash
 git clone https://github.com/Vamsidhar3081/task-tracker.git
+```
 
-Go to the project folder
+Go to the project folder:
 
-
+```bash
 cd task-tracker
+```
 
+Install dependencies:
 
-Install dependencies
-
-
+```bash
 npm install
+```
 
+Run the development server:
 
-Run the development server
-
-
+```bash
 npm run dev
+```
 
+The application will run at:
 
-The application will run at
-
-
+```
 http://localhost:5173
-
+```
 
 ---
 
 ## Backend API
 
-This frontend connects to the FlowTasks backend API.
+This frontend connects to the FlowTasks backend API, which handles authentication, tasks, statistics and the AI assistant.
 
-Backend repository:  
+Backend repository:
 https://github.com/Vamsidhar3081/flowtasks-backend
 
 ---
@@ -100,29 +173,3 @@ https://github.com/Vamsidhar3081/flowtasks-backend
 ## Author
 
 Vamsidhar Reddy Dandu
-## AI Task Assistant
-
-The dashboard includes an AI Assistant powered by a Groq-hosted language model. Users can ask natural-language questions about tasks and users, for example:
-
-- Which tasks assigned to Mouser are overdue?
-- Show me all tasks with more than 2 delays.
-- Summarize why the dashboard task got delayed.
-
-The assistant converts the question into structured task filters, queries the backend, and displays readable task results. It supports task lists, status and overdue questions, delay-count conditions, user statistics, and delay summaries.
-
-### AI Configuration
-
-The AI key is used only by the backend and must never be committed to GitHub or exposed as a `VITE_` frontend variable. Configure these variables in the backend hosting provider:
-
-```env
-OPENAI_API_KEY=your_groq_api_key
-OPENAI_MODEL=openai/gpt-oss-120b
-OPENAI_BASE_URL=https://api.groq.com/openai/v1
-```
-
-For local development, keep the same values in the backend `.env` file. Configure the deployed backend URL in Vercel as `VITE_API_URL`:
-
-```env
-VITE_API_URL=https://your-backend-domain.com/api/
-```
-
