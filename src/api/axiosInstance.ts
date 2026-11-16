@@ -8,8 +8,9 @@ const axiosInstance = axios.create({
 // attach token automatically
 axiosInstance.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
+  const isLoginRequest = config.url === "/auth/login";
 
-  if (token) {
+  if (token && !isLoginRequest) {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
@@ -20,7 +21,8 @@ axiosInstance.interceptors.request.use((config) => {
 axiosInstance.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401) {
+    const isLoginRequest = err.config?.url === "/auth/login";
+    if (err.response?.status === 401 && !isLoginRequest) {
       localStorage.removeItem("token");
       localStorage.removeItem("userId");
       localStorage.removeItem("role");

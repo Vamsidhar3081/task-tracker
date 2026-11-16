@@ -328,3 +328,12 @@ export const getTaskStats = async (params: { assignedTo?: number | "" } = {}) =>
     return handleError(err, "Failed to fetch task stats");
   }
 };
+
+export const getSetupStatus = async () => {
+  try {
+    const res = await axios.get("/auth/setup-status");
+    return Boolean(res.data?.needsSetup);
+  } catch {
+    return false;
+  }
+};

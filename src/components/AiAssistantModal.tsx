@@ -6,7 +6,11 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 type Props = { onClose: () => void };
-const examples = ["Which tasks assigned to Mouser are overdue?", "Show me all tasks with more than 2 delays.", "Summarize why the dashboard task got delayed."];
+const examples = [
+  "Which tasks assigned to [name] are overdue?",
+  "Show me all tasks with more than 2 delays.",
+  "Summarize why [task name] got delayed.",
+];
 
 const Markdown = ({ text }: { text?: string }) => (
   <div className="ai-answer">
